@@ -8,10 +8,12 @@ namespace Dab.DacFx
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
-
+            // CONFIG OPTIONS
             string dacpath = "/Users/drewsk/Documents/CodeRepos/dzsquared/dab-dacfx/AdventureWorksLT.dacpac";
             TSqlModel model = new TSqlModel(dacpath);
+
+            bool includeViews = true;
+            string standardPermissions = "anonymous:*";
 
             string configPath = "/Users/drewsk/Documents/CodeRepos/dzsquared/dab-dacfx/testproj/dab-config.json";
             bool validConfig = CheckForConfig(configPath);
@@ -21,20 +23,36 @@ namespace Dab.DacFx
                 return;
             }
 
+            TableSet tableSet = new TableSet();
+
             // execute process dab add Author --source "dbo.authors" --permissions "anonymous:*"
             ProcessStartInfo startInfo = new ProcessStartInfo();
             startInfo.FileName = "dab";
+            startInfo.RedirectStandardOutput = true;
+            startInfo.UseShellExecute = false;
+            startInfo.CreateNoWindow = true;
 
-            // Get the tables in the model
+            // for each table in the model, add to the tableSet
             foreach (TSqlObject table in model.GetObjects(DacQueryScopes.UserDefined, Table.TypeClass))
             {
-                Console.WriteLine($"Adding {table.Name}...");
+                tableSet.AddTable(table);
+            }
 
+            // if includeViews, add views to tableSet
+            if (includeViews)
+            {
+                foreach (TSqlObject view in model.GetObjects(DacQueryScopes.UserDefined, View.TypeClass))
+                {
+                    tableSet.AddTable(view);
+                }
+            }
+
+            // for each table in the tableset, add it to dab
+            foreach (EntityTable table in tableSet.Tables)
+            {
+                Console.WriteLine($"Adding {table.EntityName}...");
                 Process process = new Process();
-                startInfo.Arguments = $"add \"{table.Name}\" --config \"{configPath}\" --source \"{table.Name}\" --permissions \"anonymous:*\"";
-                startInfo.RedirectStandardOutput = true;
-                startInfo.UseShellExecute = false;
-                startInfo.CreateNoWindow = true;
+                startInfo.Arguments = $"add \"{table.EntityName}\" --config \"{configPath}\" --source \"{table.TableName}\" --permissions \"{standardPermissions}\" ";
                 process.StartInfo = startInfo;
                 process.Start();
                 process.WaitForExit();
@@ -60,6 +78,47 @@ namespace Dab.DacFx
             }
 
             return validConfig;
+        }
+
+    }
+
+    // describes a table in the database
+    // entity name and TSqlObject table
+    // could be expanded to include relationship information
+    public class EntityTable
+    {
+        public string EntityName { get; set; }
+        public string TableName { get; set; }
+
+        public EntityTable(string entityName, string tableName)
+        {
+            EntityName = entityName;
+            TableName = tableName;
+        }
+    }
+
+
+    public class TableSet
+    {
+        public List<EntityTable> Tables { get; set; }
+
+        public TableSet()
+        {
+            Tables = new List<EntityTable>();
+        }
+
+        public void AddTable(TSqlObject tableObj)
+        {
+            string tableName = tableObj.Name.Parts[1];
+
+            // lookup tablename in list for conflicting names
+            if (Tables.Any(t => t.EntityName == tableName))
+            {
+                tableName = $"{tableObj.Name.Parts[0]}_{tableObj.Name.Parts[1]}";
+            }
+
+            EntityTable table = new EntityTable(tableName, tableObj.Name.ToString());
+            Tables.Add(table);
         }
     }
 }
