@@ -13,7 +13,7 @@ dab-dacfx -d "C:\path\to\your\database.dacpac" -c "C:\path\to\your\dab\config.js
 ### Inputs
 
 | Name | Description | Required | Default |
-| --- | --- | --- |
+| --- | --- | --- | --- |
 | -d | Path to the dacpac file | true, or -s | |
 | -s | Connection string to the database | true, or -d | |
 | -c | Path to the config file | true | |
